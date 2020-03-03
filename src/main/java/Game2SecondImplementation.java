@@ -11,10 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class Game2FirstImplementation {
+public class Game2SecondImplementation {
     public static AtomicInteger ActiveThreads = new AtomicInteger(0);
     static final LinkedList<PlayerThread> playerList = new LinkedList<>();
-    static Lock listLock = new ReentrantLock();
 
     public static class MatchThread implements Runnable{
         PlayerThread player1;
@@ -34,10 +33,9 @@ public class Game2FirstImplementation {
                 player2.reRoll();
                 winner = this.fight();
             }
-            listLock.tryLock();
+            synchronized (playerList){
                 playerList.add(winner);
-            listLock.unlock();
-        //    System.out.println("Winner: " + winner.name + "   Players Remaining: " + ActiveThreads.intValue());
+            }
             return;
         }
         public synchronized PlayerThread fight(){
@@ -115,7 +113,6 @@ public class Game2FirstImplementation {
         long startTime = System.nanoTime();
         for(int i = 0; i < playerCount; i++){
             PlayerThread player = new PlayerThread(("Player " + (i+1)));
-            player.setDaemon(true);
             player.start();
             playerList.add(player);
         }
@@ -123,16 +120,21 @@ public class Game2FirstImplementation {
 
         while(ActiveThreads.intValue() > 1){
             try {
-                listLock.tryLock();
-                if(playerList.size() >= 2){
-                    threadPool.submit(new MatchThread(playerList.remove(), playerList.remove()));
+                synchronized(playerList){
+                    if(playerList.size() >= 2){
+                        threadPool.submit(new MatchThread(playerList.remove(), playerList.remove()));
+                    }
                 }
-                listLock.unlock();
             }catch(Exception e) {
-        }}
+
+            }
+        }
         threadPool.shutdown();
         long endTime = System.nanoTime();
-        System.out.println("The winner is " + playerList.remove().name);
-        System.out.println("Time elapsed: " + (endTime-startTime) + "ns");
+        PlayerThread winner = playerList.remove();
+        winner.isAlive.set(false);
+
+        System.out.println("            The winner is " + winner.name);
+        System.out.println("            Time elapsed: " + (endTime-startTime) + "ns");
     }
 }
